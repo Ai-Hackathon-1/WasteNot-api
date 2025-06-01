@@ -1,30 +1,3 @@
-// import express from 'express';
-// import mongoose from 'mongoose';
-// import dotenv from 'dotenv';
-
-// dotenv.config();
-
-// const connectionString = process.env.MONGO_URI;mongoose
-//   .connect(connectionString)
-//   .then(() => {
-//     console.log('database connected');
-//   })
-//   .catch((err) => {
-//     console.log(err);
-//   });
-
-
-
-// const app = express();
-
-
-
-
-
-// const port = process.env.PORT || 5957;
-// app.listen(port, () => {
-//   console.log(`server is listening on port ${port}`);
-// });
 
 import express from 'express';
 import mongoose from 'mongoose';
@@ -42,7 +15,7 @@ import dotenv from 'dotenv';
 // Import routes
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
-
+import foodWasteRoutes from './routes/foodWasteRoutes.js';
 // Import middleware
 import globalErrorHandler from './middlewares/errorHandler.js';
 import AppError from './utils/appError.js';
@@ -168,7 +141,7 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
-
+app.use('/api/posts', foodWasteRoutes);
 // Welcome route
 app.get('/', (req, res) => {
   res.status(200).json({
@@ -179,6 +152,7 @@ app.get('/', (req, res) => {
     endpoints: {
       auth: '/api/v1/auth',
       users: '/api/v1/users',
+      post: '/api/posts',
     }
   });
 });
