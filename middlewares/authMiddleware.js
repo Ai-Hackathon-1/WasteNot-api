@@ -1,7 +1,7 @@
 import User from '../models/User.js';
 import jwt from 'jsonwebtoken';
 import catchAsync from '../utils/catchAsync.js';
-import appError from '../utils/appError.js';
+import AppError from '../utils/appError.js';
 
 /**
  * Authentication middleware to verify JWT tokens
@@ -20,7 +20,7 @@ const authMiddleware = catchAsync(async (req, res, next) => {
   }
 
   if (!token) {
-    return next(new appError('You are not logged in! Please log in to get access.', 401));
+    return next(new AppError('You are not logged in! Please log in to get access.', 401));
   }
 
   // 2) Verification of token
@@ -29,24 +29,24 @@ const authMiddleware = catchAsync(async (req, res, next) => {
     decoded = jwt.verify(token, process.env.JWT_SECRET);
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
-      return next(new appError('Invalid token. Please log in again!', 401));
+      return next(new AppError('Invalid token. Please log in again!', 401));
     } else if (error.name === 'TokenExpiredError') {
-      return next(new appError('Your token has expired! Please log in again.', 401));
+      return next(new AppError('Your token has expired! Please log in again.', 401));
     }
-    return next(new appError('Token verification failed!', 401));
+    return next(new AppError('Token verification failed!', 401));
   }
 
   // 3) Check if user still exists (optional - requires User model)
   const currentUser = await User.findById(decoded.id);
   if (!currentUser) {
-    return next(new appError('The user belonging to this token does no longer exist.', 401));
+    return next(new AppError('The user belonging to this token does no longer exist.', 401));
   }
   
 
   // 4) Check if user changed password after the token was issued (optional)
   /*
   if (currentUser.changedPasswordAfter(decoded.iat)) {
-    return next(new appError('User recently changed password! Please log in again.', 401));
+    return next(new AppError('User recently changed password! Please log in again.', 401));
   }
   */
 
@@ -64,7 +64,7 @@ const authMiddleware = catchAsync(async (req, res, next) => {
 const restrictTo = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.role)) {
-      return next(new appError('You do not have permission to perform this action', 403));
+      return next(new AppError('You do not have permission to perform this action', 403));
     }
     next();
   };

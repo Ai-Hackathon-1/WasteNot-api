@@ -3,6 +3,9 @@ import User from '../models/User.js';
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 // Configure Cloudinary (add to your .env file)
 cloudinary.config({
