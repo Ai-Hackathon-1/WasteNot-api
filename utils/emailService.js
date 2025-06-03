@@ -30,7 +30,7 @@ class EmailService {
     // For development, you can use Ethereal Email (temporary testing emails)
     // Or configure your preferred SMTP settings
     return nodemailer.createTransport({
-      host: process.env.EMAIL_HOST || 'smtp.ethereal.email',
+      host: process.env.EMAIL_HOST || 'gmail',
       port: process.env.EMAIL_PORT || 587,
       secure: false, // true for 465, false for other ports
       auth: {
@@ -93,7 +93,7 @@ class EmailService {
     };
 
     try {
-      const info = await this.transporter.sendMail(mailOptions);
+      const info = await this.transport.sendMail(mailOptions);
       console.log('Password reset email sent: %s', info.messageId);
       return info;
     } catch (error) {
@@ -117,7 +117,7 @@ class EmailService {
     };
 
     try {
-      const info = await this.transporter.sendMail(mailOptions);
+      const info = await this.transport.sendMail(mailOptions);
       console.log('Welcome email sent: %s', info.messageId);
       return info;
     } catch (error) {
