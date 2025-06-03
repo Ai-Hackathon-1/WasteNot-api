@@ -167,10 +167,8 @@ app.use(globalErrorHandler);
 
 // Start server
 const port = process.env.PORT || 5957;
-const server = app.listen(port, () => {
+const server = app.listen(port, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${port}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
-  console.log(`📚 API Documentation: http://localhost:${port}/api/v1/docs`);
 });
 
 // Handle unhandled promise rejections
