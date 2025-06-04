@@ -139,6 +139,16 @@ app.get('/health', (req, res) => {
 });
 
 // API Routes
+app.post('/send-email', async (req, res) => {
+  const { to, subject, text, html } = req.body;
+  try {
+    await sendMail({ to, subject, text, html });
+    res.json({ success: true, message: 'Email sent' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/posts', foodWasteRoutes);
@@ -187,11 +197,22 @@ process.on('SIGTERM', () => {
     console.log('💥 Process terminated!');
   });
 });
-// import emailService from './utils/emailService.js';
+import emailService from './utils/emailService.js';
+// emailService.testConnection()
+//   .then(result => {
+//     if (result) {
+//       console.log('✅ Email service connection test passed.');
+//     } else {
+//       console.error('❌ Email service connection test failed.');
+//     }
+//   })
+//   .catch(error => {
+//     console.error('Error testing email service connection:', error);
+//   });
 
 // async function testSendVerificationEmail() {
 //   try {
-//     const to = 'trader619@gmail.com'; // Replace with your real email address
+//     const to = 'ibrah.webdev@gmail.com'; // Replace with your real email address
 //     const name = 'Test User';
 //     const verificationToken = 'dummy-verification-token';
 //     const baseUrl = 'http://localhost:3000'; // Adjust if needed
