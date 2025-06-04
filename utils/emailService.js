@@ -59,7 +59,7 @@ class EmailService {
     };
 
     try {
-      const info = await this.transporter.sendMail(mailOptions);
+      const info = await this.transport.sendMail(mailOptions);
       console.log('Verification email sent: %s', info.messageId);
       
       // For development with Ethereal, log the preview URL
@@ -276,7 +276,7 @@ class EmailService {
    */
   async testConnection() {
     try {
-      await this.transporter.verify();
+      await this.transport.verify();
       console.log('SMTP configuration is valid');
       return true;
     } catch (error) {
