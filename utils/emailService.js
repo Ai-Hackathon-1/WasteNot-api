@@ -1,292 +1,301 @@
 import nodemailer from 'nodemailer';
 import AppError from './appError.js';
 
-/**
- * Email service class for handling all email operations
- */
 class EmailService {
   constructor() {
     this.transport = this.createTransport();
   }
 
-  /**
-   * Create nodemailer transporter based on environment
-   * @returns {Object} Nodemailer transporter
-   */
   createTransport() {
-    // For production, use a real SMTP service
-    if (process.env.NODE_ENV === 'production') {
-      return nodemailer.createTransport({
-        service: process.env.EMAIL_SERVICE || 'gmail', // gmail, outlook, etc.
-        auth: {
-          user: process.env.EMAIL_USERNAME,
-          pass: process.env.EMAIL_PASSWORD, // Use app password for Gmail
-        },
-        secure: true,
-        port: 465,
-      });
-    }
-
-    // For development, you can use Ethereal Email (temporary testing emails)
-    // Or configure your preferred SMTP settings
+    // Production-ready Gmail configuration
     return nodemailer.createTransport({
-      host: process.env.EMAIL_HOST || 'gmail',
-      port: process.env.EMAIL_PORT || 587,
-      secure: false, // true for 465, false for other ports
+      service: 'gmail',
       auth: {
-        user: process.env.EMAIL_USERNAME,
-        pass: process.env.EMAIL_PASSWORD,
+        user: process.env.EMAIL_FROM,
+        pass: process.env.GMAIL_APP_PASSWORD, // Gmail App Password
       },
+      secure: true,
+      port: 465,
+      pool: true, // Use connection pooling for better performance
+      maxConnections: 5,
+      maxMessages: 100,
     });
   }
 
-  /**
-   * Send email verification email
-   * @param {string} to - Recipient email address
-   * @param {string} name - Recipient name
-   * @param {string} verificationToken - Email verification token
-   * @param {string} baseUrl - Base URL of the application
-   */
-  async sendVerificationEmail(to, name, verificationToken, baseUrl) {
-    const verificationUrl = `${baseUrl}/api/auth/verify-email/${verificationToken}`;
-    
-    const mailOptions = {
-      from: `"${process.env.EMAIL_FROM_NAME || 'WasteNot App'}" <${process.env.EMAIL_FROM || process.env.EMAIL_USERNAME}>`,
-      to,
-      subject: 'Email Verification - WasteNot App',
-      html: this.getVerificationEmailTemplate(name, verificationUrl),
-      text: `Hi ${name},\n\nPlease verify your email by clicking the following link:\n${verificationUrl}\n\nThis link will expire in 24 hours.\n\nIf you didn't create an account, please ignore this email.\n\nBest regards,\nWasteNot Team`,
-    };
-
+  async sendEmail(options) {
     try {
+      // 1) Define email options
+      const mailOptions = {
+        from: `${process.env.EMAIL_FROM_NAME || 'WasteNot App'} <${process.env.EMAIL_FROM}>`,
+        to: options.email,
+        subject: options.subject,
+        text: options.message,
+        html: options.html,
+      };
+
+      // 2) Actually send the email
       const info = await this.transport.sendMail(mailOptions);
-      console.log('Verification email sent: %s', info.messageId);
       
-      // For development with Ethereal, log the preview URL
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
-      }
-      
+      console.log('Email sent successfully:', info.messageId);
       return info;
     } catch (error) {
-      console.error('Error sending verification email:', error);
-      throw new AppError('Error sending verification email. Please try again later.', 500);
+      console.error('Email sending failed:', error);
+      throw new AppError('There was an error sending the email. Try again later.', 500);
     }
   }
 
-  /**
-   * Send password reset email
-   * @param {string} to - Recipient email address
-   * @param {string} name - Recipient name
-   * @param {string} resetToken - Password reset token
-   * @param {string} baseUrl - Base URL of the application
-   */
-  async sendPasswordResetEmail(to, name, resetToken, baseUrl) {
-    const resetUrl = `${baseUrl}/api/auth/reset-password/${resetToken}`;
+  async sendWelcomeEmail(user, verificationToken) {
+    const verifyURL = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
     
-    const mailOptions = {
-      from: `"${process.env.EMAIL_FROM_NAME || 'WasteNot App'}" <${process.env.EMAIL_FROM || process.env.EMAIL_USERNAME}>`,
-      to,
-      subject: 'Password Reset Request - WasteNot App',
-      html: this.getPasswordResetEmailTemplate(name, resetUrl),
-      text: `Hi ${name},\n\nYou requested a password reset. Click the following link to reset your password:\n${resetUrl}\n\nThis link will expire in 10 minutes.\n\nIf you didn't request this, please ignore this email.\n\nBest regards,\nWasteNot Team`,
-    };
-
-    try {
-      const info = await this.transport.sendMail(mailOptions);
-      console.log('Password reset email sent: %s', info.messageId);
-      return info;
-    } catch (error) {
-      console.error('Error sending password reset email:', error);
-      throw new AppError('Error sending password reset email. Please try again later.', 500);
-    }
-  }
-
-  /**
-   * Send welcome email after successful verification
-   * @param {string} to - Recipient email address
-   * @param {string} name - Recipient name
-   */
-  async sendWelcomeEmail(to, name) {
-    const mailOptions = {
-      from: `"${process.env.EMAIL_FROM_NAME || 'WasteNot App'}" <${process.env.EMAIL_FROM || process.env.EMAIL_USERNAME}>`,
-      to,
-      subject: 'Welcome to WasteNot App!',
-      html: this.getWelcomeEmailTemplate(name),
-      text: `Hi ${name},\n\nWelcome to WasteNot App! Your email has been successfully verified.\n\nYou can now enjoy all the features of our platform.\n\nBest regards,\nWasteNot Team`,
-    };
-
-    try {
-      const info = await this.transport.sendMail(mailOptions);
-      console.log('Welcome email sent: %s', info.messageId);
-      return info;
-    } catch (error) {
-      console.error('Error sending welcome email:', error);
-      // Don't throw error for welcome email as it's not critical
-      return null;
-    }
-  }
-
-  /**
-   * HTML template for email verification
-   * @param {string} name - User name
-   * @param {string} verificationUrl - Verification URL
-   * @returns {string} HTML template
-   */
-  getVerificationEmailTemplate(name, verificationUrl) {
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Email Verification</title>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; }
-          .content { padding: 30px; background-color: #f9f9f9; }
-          .button { display: inline-block; padding: 12px 24px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>Email Verification</h1>
-          </div>
-          <div class="content">
-            <h2>Hi ${name}!</h2>
-            <p>Thank you for registering with WasteNot App. To complete your registration, please verify your email address by clicking the button below:</p>
-            <div style="text-align: center;">
-              <a href="${verificationUrl}" class="button">Verify Email Address</a>
-            </div>
-            <p>Or copy and paste this link in your browser:</p>
-            <p style="word-break: break-all; color: #666;">${verificationUrl}</p>
-            <p><strong>This link will expire in 24 hours.</strong></p>
-            <p>If you didn't create an account with us, please ignore this email.</p>
-          </div>
-          <div class="footer">
-            <p>Best regards,<br>The WasteNot Team</p>
-          </div>
+    const subject = 'Welcome! Please verify your email address';
+    const message = `Welcome to Food Waste Management App, ${user.firstName}!\n\nPlease verify your email address by clicking the link below:\n${verifyURL}\n\nThis link will expire in 24 hours.\n\nIf you didn't create this account, please ignore this email.`;
+    
+    const html = `
+      <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to Food Waste Management!</h1>
         </div>
-      </body>
-      </html>
-    `;
-  }
-
-  /**
-   * HTML template for password reset
-   * @param {string} name - User name
-   * @param {string} resetUrl - Password reset URL
-   * @returns {string} HTML template
-   */
-  getPasswordResetEmailTemplate(name, resetUrl) {
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Password Reset</title>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background-color: #FF6B6B; color: white; padding: 20px; text-align: center; }
-          .content { padding: 30px; background-color: #f9f9f9; }
-          .button { display: inline-block; padding: 12px 24px; background-color: #FF6B6B; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>Password Reset Request</h1>
+        
+        <div style="padding: 30px; background: #f9f9f9; border-radius: 0 0 10px 10px;">
+          <h2 style="color: #333; margin-top: 0;">Hi ${user.firstName}!</h2>
+          
+          <p style="font-size: 16px; margin-bottom: 25px;">
+            Thank you for joining our mission to reduce food waste! To get started, please verify your email address.
+          </p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${verifyURL}" 
+               style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                      color: white; 
+                      padding: 15px 30px; 
+                      text-decoration: none; 
+                      border-radius: 25px; 
+                      font-weight: bold; 
+                      display: inline-block;
+                      transition: transform 0.3s ease;">
+              Verify Email Address
+            </a>
           </div>
-          <div class="content">
-            <h2>Hi ${name}!</h2>
-            <p>You requested a password reset for your WasteNot App account. Click the button below to reset your password:</p>
-            <div style="text-align: center;">
-              <a href="${resetUrl}" class="button">Reset Password</a>
-            </div>
-            <p>Or copy and paste this link in your browser:</p>
-            <p style="word-break: break-all; color: #666;">${resetUrl}</p>
-            <p><strong>This link will expire in 10 minutes for security reasons.</strong></p>
-            <p>If you didn't request this password reset, please ignore this email. Your password will remain unchanged.</p>
-          </div>
-          <div class="footer">
-            <p>Best regards,<br>The WasteNot Team</p>
-          </div>
+          
+          <p style="font-size: 14px; color: #666; margin-top: 25px;">
+            <strong>Note:</strong> This verification link will expire in 24 hours.
+          </p>
+          
+          <p style="font-size: 14px; color: #666;">
+            If the button doesn't work, copy and paste this link into your browser:<br>
+            <a href="${verifyURL}" style="color: #667eea; word-break: break-all;">${verifyURL}</a>
+          </p>
+          
+          <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;">
+          
+          <p style="font-size: 12px; color: #999; text-align: center;">
+            If you didn't create this account, please ignore this email.<br>
+            This email was sent from Food Waste Management App.
+          </p>
         </div>
-      </body>
-      </html>
+      </div>
     `;
+
+    await this.sendEmail({
+      email: user.email,
+      subject,
+      message,
+      html,
+    });
   }
 
-  /**
-   * HTML template for welcome email
-   * @param {string} name - User name
-   * @returns {string} HTML template
-   */
-  getWelcomeEmailTemplate(name) {
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Welcome to WasteNot App</title>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; }
-          .content { padding: 30px; background-color: #f9f9f9; }
-          .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>Welcome to WasteNot App!</h1>
-          </div>
-          <div class="content">
-            <h2>Hi ${name}!</h2>
-            <p>Your email has been successfully verified and your account is now active!</p>
-            <p>You can now enjoy all the features of WasteNot App:</p>
-            <ul>
-              <li>Track your waste reduction progress</li>
-              <li>Discover eco-friendly alternatives</li>
-              <li>Connect with like-minded individuals</li>
-              <li>Access exclusive sustainability tips</li>
-            </ul>
-            <p>Thank you for joining our mission to reduce waste and protect our planet!</p>
-          </div>
-          <div class="footer">
-            <p>Best regards,<br>The WasteNot Team</p>
-          </div>
+  async sendPasswordResetEmail(user, resetToken) {
+    const resetURL = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
+    
+    const subject = 'Password Reset Request (Valid for 10 minutes)';
+    const message = `Hi ${user.firstName},\n\nYou requested a password reset. Please click the link below to reset your password:\n${resetURL}\n\nThis link will expire in 10 minutes for security reasons.\n\nIf you didn't request this, please ignore this email and your password will remain unchanged.`;
+    
+    const html = `
+      <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">Password Reset Request</h1>
         </div>
-      </body>
-      </html>
+        
+        <div style="padding: 30px; background: #f9f9f9; border-radius: 0 0 10px 10px;">
+          <h2 style="color: #333; margin-top: 0;">Hi ${user.firstName}!</h2>
+          
+          <p style="font-size: 16px; margin-bottom: 25px;">
+            We received a request to reset your password. Click the button below to create a new password.
+          </p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetURL}" 
+               style="background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%); 
+                      color: white; 
+                      padding: 15px 30px; 
+                      text-decoration: none; 
+                      border-radius: 25px; 
+                      font-weight: bold; 
+                      display: inline-block;">
+              Reset Password
+            </a>
+          </div>
+          
+          <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 14px; color: #856404;">
+              <strong>⚠️ Security Notice:</strong> This link will expire in 10 minutes for your security.
+            </p>
+          </div>
+          
+          <p style="font-size: 14px; color: #666;">
+            If the button doesn't work, copy and paste this link into your browser:<br>
+            <a href="${resetURL}" style="color: #ff6b6b; word-break: break-all;">${resetURL}</a>
+          </p>
+          
+          <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;">
+          
+          <p style="font-size: 12px; color: #999; text-align: center;">
+            If you didn't request this password reset, please ignore this email.<br>
+            Your password will remain unchanged.
+          </p>
+        </div>
+      </div>
     `;
+
+    await this.sendEmail({
+      email: user.email,
+      subject,
+      message,
+      html,
+    });
   }
 
-  /**
-   * Test email configuration
-   * @returns {boolean} True if configuration is valid
-   */
+  async sendPasswordChangeConfirmation(user) {
+    const subject = 'Password Changed Successfully';
+    const message = `Hi ${user.firstName},\n\nThis email confirms that your password was successfully changed.\n\nIf you didn't make this change, please contact our support team immediately.\n\nFor your security, you've been logged out of all devices and will need to log in again with your new password.`;
+    
+    const html = `
+      <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">Password Changed</h1>
+        </div>
+        
+        <div style="padding: 30px; background: #f9f9f9; border-radius: 0 0 10px 10px;">
+          <h2 style="color: #333; margin-top: 0;">Hi ${user.firstName}!</h2>
+          
+          <div style="background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 16px; color: #155724;">
+              ✅ Your password has been successfully changed.
+            </p>
+          </div>
+          
+          <p style="font-size: 16px;">
+            For your security, you've been logged out of all devices. Please log in again with your new password.
+          </p>
+          
+          <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 14px; color: #856404;">
+              <strong>⚠️ Security Alert:</strong> If you didn't make this change, please contact our support team immediately.
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${process.env.CLIENT_URL}/login" 
+               style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%); 
+                      color: white; 
+                      padding: 15px 30px; 
+                      text-decoration: none; 
+                      border-radius: 25px; 
+                      font-weight: bold; 
+                      display: inline-block;">
+              Login Now
+            </a>
+          </div>
+          
+          <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;">
+          
+          <p style="font-size: 12px; color: #999; text-align: center;">
+            This is an automated security notification.<br>
+            Food Waste Management App Security Team
+          </p>
+        </div>
+      </div>
+    `;
+
+    await this.sendEmail({
+      email: user.email,
+      subject,
+      message,
+      html,
+    });
+  }
+
+  async sendAccountDeactivationEmail(user) {
+    const subject = 'Account Deactivated';
+    const message = `Hi ${user.firstName},\n\nYour account has been deactivated. If you believe this was done in error, please contact our support team.\n\nThank you for being part of our community.`;
+    
+    const html = `
+      <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">Account Deactivated</h1>
+        </div>
+        
+        <div style="padding: 30px; background: #f9f9f9; border-radius: 0 0 10px 10px;">
+          <h2 style="color: #333; margin-top: 0;">Hi ${user.firstName}!</h2>
+          
+          <p style="font-size: 16px; margin-bottom: 25px;">
+            Your account has been deactivated. You will no longer be able to access your account or use our services.
+          </p>
+          
+          <p style="font-size: 16px; margin-bottom: 25px;">
+            If you believe this was done in error or have any questions, please contact our support team.
+          </p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="mailto:${process.env.EMAIL_FROM}" 
+               style="background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%); 
+                      color: white; 
+                      padding: 15px 30px; 
+                      text-decoration: none; 
+                      border-radius: 25px; 
+                      font-weight: bold; 
+                      display: inline-block;">
+              Contact Support
+            </a>
+          </div>
+          
+          <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;">
+          
+          <p style="font-size: 12px; color: #999; text-align: center;">
+            Thank you for being part of our community.<br>
+            Food Waste Management App Team
+          </p>
+        </div>
+      </div>
+    `;
+
+    await this.sendEmail({
+      email: user.email,
+      subject,
+      message,
+      html,
+    });
+  }
+
+  // Test email connection
   async testConnection() {
     try {
       await this.transport.verify();
-      console.log('SMTP configuration is valid');
+      console.log('✅ Email service is ready to send emails');
       return true;
     } catch (error) {
-      console.error('SMTP configuration error:', error);
+      console.error('❌ Email service configuration error:', error);
       return false;
     }
   }
+
+  // Close transporter connection
+  close() {
+    this.transport.close();
+  }
 }
 
-// Create and export a singleton instance
+// Create singleton instance
 const emailService = new EmailService();
 
 export default emailService;

@@ -187,5 +187,20 @@ process.on('SIGTERM', () => {
     console.log('💥 Process terminated!');
   });
 });
+// import emailService from './utils/emailService.js';
+
+// async function testSendVerificationEmail() {
+//   try {
+//     const to = 'trader619@gmail.com'; // Replace with your real email address
+//     const name = 'Test User';
+//     const verificationToken = 'dummy-verification-token';
+//     const baseUrl = 'http://localhost:3000'; // Adjust if needed
+
+//     const result = await emailService.sendVerificationEmail(to, name, verificationToken, baseUrl);
+//     console.log('Test email sent successfully:', result);
+//   } catch (error) {
+//     console.error('Error sending test email:', error);
+//   }
+// }
 
 export default app;
